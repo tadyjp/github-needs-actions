@@ -1,6 +1,13 @@
 
+## Init
 
 ```
-$ GOOS=linux GOARCH=amd64 go build -o run
-$ zip run.zip ./run
+$ cp .env.sample .env
+$ cp config/slack_id_mapping.yaml.sample config/slack_id_mapping.yaml
+```
+
+## Build
+
+```
+$ make build
 ```

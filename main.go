@@ -18,7 +18,7 @@ func run() {
 		AccessToken: os.Getenv("GITHUB_ACCESS_TOKEN"),
 		Owner:       os.Getenv("GITHUB_TARGET_OWNER"),
 		Repo:        os.Getenv("GITHUB_TARGET_REPO"),
-		Label:       os.Getenv("GITHUB_TARGET_LABEL"),
+		PullLabel:   os.Getenv("GITHUB_TARGET_PR_LABEL"),
 	}
 
 	if d, ok := os.LookupEnv("GITHUB_DAYS_AGO"); ok {
@@ -36,14 +36,14 @@ func run() {
 	}
 
 	client, ctx := github.GetClient(githubConfig)
-
+	idMap := github.GetGithubSlackMap()
 	requestedPulls := github.GetRequestedPulls(client, ctx, githubConfig)
-	pullsSlackText := requestedPulls.GetSlackText(githubConfig)
+	pullsSlackText := requestedPulls.GetSlackText(githubConfig, &idMap)
 	fmt.Println(pullsSlackText)
 	slack.PostTextToSlack(slackConfig, pullsSlackText)
 
 	requestedIssues := github.GetOldIssues(client, ctx, githubConfig)
-	issuesSlackText := requestedIssues.GetSlackText(githubConfig)
+	issuesSlackText := requestedIssues.GetSlackText(githubConfig, &idMap)
 	fmt.Println(issuesSlackText)
 	slack.PostTextToSlack(slackConfig, issuesSlackText)
 }

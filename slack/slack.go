@@ -15,11 +15,10 @@ type Config struct {
 
 func PostTextToSlack(cfg *Config, msg string) {
 	payload := slack.Payload{
-		Username: cfg.Username,
-		Channel:  cfg.Channel,
-		Markdown: true,
-		
-		Text:     msg,
+		Username:  cfg.Username,
+		Channel:   cfg.Channel,
+		Markdown:  true,
+		Text:      msg,
 	}
 
 	err := slack.Send(cfg.WebhookURL, "", payload)

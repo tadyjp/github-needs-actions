@@ -3,19 +3,21 @@ package github
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/google/go-github/v28/github"
 	"golang.org/x/oauth2"
+	yaml "gopkg.in/yaml.v2"
 )
 
 type Config struct {
 	AccessToken string
 	Owner       string
 	Repo        string
-	Label       string
+	PullLabel   string
 	DaysAgo     int
 }
 
@@ -32,6 +34,25 @@ type RequestedIssue struct {
 }
 
 type RequestedIssues []RequestedIssue
+
+type GithubSlackMap map[string]string
+
+func GetGithubSlackMap() GithubSlackMap {
+	buf, err := ioutil.ReadFile("config/slack_id_mapping.yaml")
+	if err != nil {
+		fmt.Println("GetGithubSlackMap file read error", err)
+		os.Exit(1)
+	}
+
+	var mapping GithubSlackMap
+
+	if err := yaml.Unmarshal(buf, &mapping); err != nil {
+		fmt.Println("GetGithubSlackMap yaml.Unmarshal error", err)
+		os.Exit(1)
+	}
+
+	return mapping
+}
 
 func GetClient(cfg *Config) (*github.Client, *context.Context) {
 	ctx := context.Background()
@@ -56,11 +77,11 @@ func GetRequestedPulls(client *github.Client, ctx *context.Context, cfg *Config)
 		}
 
 		for _, pull := range pulls {
-			if cfg.Label != "" {
+			if cfg.PullLabel != "" {
 				hasMatchLabel := false
 
 				for _, label := range pull.Labels {
-					if label.GetName() == cfg.Label {
+					if label.GetName() == cfg.PullLabel {
 						hasMatchLabel = true
 					}
 				}
@@ -91,15 +112,15 @@ func GetRequestedPulls(client *github.Client, ctx *context.Context, cfg *Config)
 	return requestedPulls
 }
 
-func (pulls *RequestedPulls) GetSlackText(cfg *Config) string {
+func (pulls *RequestedPulls) GetSlackText(cfg *Config, idMap *GithubSlackMap) string {
 	var sb strings.Builder
 
 	if len(*pulls) == 0 {
-		sb.WriteString("There is no waiting pull requests :tada:")
+		sb.WriteString("There are no waiting pull requests. :tada:")
 		return sb.String()
 	}
 
-	sb.WriteString(fmt.Sprintf("These pull request (with %s tag) needs actions.", cfg.Label))
+	sb.WriteString(fmt.Sprintf("These pull requests (with %s tag) need actions. :warning:", cfg.PullLabel))
 	sb.WriteString("\n")
 
 	for _, pull := range *pulls {
@@ -118,7 +139,7 @@ func (pulls *RequestedPulls) GetSlackText(cfg *Config) string {
 		sb.WriteString("\n")
 		sb.WriteString("    Next Action: ")
 		for _, user := range pull.Users {
-			sb.WriteString(fmt.Sprintf(":%s: @%s", strings.ToLower(user.GetLogin()), user.GetLogin()))
+			sb.WriteString(fmt.Sprintf(":%s: <@%s>", strings.ToLower(user.GetLogin()), (*idMap)[user.GetLogin()]))
 		}
 		sb.WriteString("\n")
 	}
@@ -162,15 +183,15 @@ func GetOldIssues(client *github.Client, ctx *context.Context, cfg *Config) Requ
 	return requestedIssues
 }
 
-func (issues *RequestedIssues) GetSlackText(cfg *Config) string {
+func (issues *RequestedIssues) GetSlackText(cfg *Config, idMap *GithubSlackMap) string {
 	var sb strings.Builder
 
 	if len(*issues) == 0 {
-		sb.WriteString("There is no old issues :tada:")
+		sb.WriteString("There are no old issues. :tada:")
 		return sb.String()
 	}
 
-	sb.WriteString(fmt.Sprintf("These issues (no update within %d days) needs actions.", cfg.DaysAgo))
+	sb.WriteString(fmt.Sprintf("These issues (no update within %d days) need actions. :warning:", cfg.DaysAgo))
 	sb.WriteString("\n")
 
 	for _, issue := range *issues {
@@ -191,7 +212,7 @@ func (issues *RequestedIssues) GetSlackText(cfg *Config) string {
 		sb.WriteString("\n")
 		sb.WriteString("    Next Action: ")
 		for _, user := range issue.Users {
-			sb.WriteString(fmt.Sprintf(":%s: @%s", strings.ToLower(user.GetLogin()), user.GetLogin()))
+			sb.WriteString(fmt.Sprintf(":%s: <@%s>", strings.ToLower(user.GetLogin()), (*idMap)[user.GetLogin()]))
 		}
 		sb.WriteString("\n")
 	}
